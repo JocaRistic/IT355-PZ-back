@@ -1,6 +1,5 @@
 package com.metropolitan.IT355pzback.security.jwt;
 
-import com.metropolitan.IT355pzback.security.services.UserDetails;
 import com.metropolitan.IT355pzback.security.services.UserDetailsService;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
@@ -11,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -18,51 +18,45 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Component
-@RequiredArgsConstructor
+//@RequiredArgsConstructor
 public class JwtRequestFilter extends OncePerRequestFilter {
 
+    @Autowired
     private JwtUtils jwtUtils;
 
+    @Autowired
     private UserDetailsService userDetailsService;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+        try {
 
-        final String requestTokenHeader = request.getHeader("Authorization");
+            String jwt = parseJwt(request);
+            if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
+                String username = jwtUtils.getUserNameFromJwtToken(jwt);
 
-        String username = null;
-        String jwtToken = null;
-        // JWT Token is in the form "Bearer token". Remove Bearer word and get only the Token
-        if (requestTokenHeader != null && requestTokenHeader.startsWith("Bearer ")) {
-            jwtToken = requestTokenHeader.substring(7);
-            try {
-                username = jwtUtils.getUsernameFromToken(jwtToken);
-            } catch (IllegalArgumentException e) {
-                System.out.println("Unable to get JWT Token");
-            } catch (ExpiredJwtException e) {
-                System.out.println("JWT Token has expired");
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(userDetails,
+                                null,
+                                userDetails.getAuthorities());
+
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                SecurityContextHolder.getContext().setAuthentication(authentication);
             }
-        } else {
-            logger.warn("JWT Token does not begin with Bearer String");
+        } catch (Exception e) {
+            logger.error("Cannot set user authentication: {}", e);
         }
 
-        //Once we get the token validate it.
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
-            UserDetails userDetails = (UserDetails) this.userDetailsService.loadUserByUsername(username);
-
-            // if token is valid configure Spring Security to manually set authentication
-            if (jwtUtils.validateToken(jwtToken, userDetails)) {
-
-                UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
-                usernamePasswordAuthenticationToken
-                        .setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                // After setting the Authentication in the context, we specify
-                // that the current user is authenticated. So it passes the Spring Security Configurations successfully.
-                SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
-            }
-        }
         filterChain.doFilter(request, response);
     }
+
+    private String parseJwt(HttpServletRequest request) {
+        String jwt = jwtUtils.getJwtFromCookies(request);
+        return jwt;
+    }
+
 }

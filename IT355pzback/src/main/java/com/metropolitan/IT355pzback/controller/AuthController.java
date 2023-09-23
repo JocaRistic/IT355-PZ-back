@@ -6,6 +6,7 @@ import com.metropolitan.IT355pzback.model.enums.RoleType;
 import com.metropolitan.IT355pzback.payload.request.LoginRequest;
 import com.metropolitan.IT355pzback.payload.request.SignupRequest;
 import com.metropolitan.IT355pzback.payload.response.MessageResponse;
+import com.metropolitan.IT355pzback.payload.response.UserInfoResponse;
 import com.metropolitan.IT355pzback.repository.RoleRepository;
 import com.metropolitan.IT355pzback.repository.UserRepository;
 import com.metropolitan.IT355pzback.security.jwt.JwtToken;
@@ -14,17 +15,22 @@ import com.metropolitan.IT355pzback.security.services.UserDetails;
 import com.metropolitan.IT355pzback.security.services.UserDetailsService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -40,19 +46,42 @@ public class AuthController {
     private final PasswordEncoder encoder;
 
     @PostMapping(value = "/login")
-    public ResponseEntity<JwtToken> login(@Valid @RequestBody LoginRequest loginRequest) throws Exception {
-        try {
-            authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
-            final UserDetails userDetails = (UserDetails) userDetailsService.loadUserByUsername(loginRequest.getUsername());
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) throws Exception {
+//        try {
+//            authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
+//            final UserDetails userDetails = (UserDetails) userDetailsService.loadUserByUsername(loginRequest.getUsername());
+//
+//            final String token = jwtTokenUtil.generateToken(userDetails);
+//
+//            return ResponseEntity.ok(new JwtToken(token));
+//        } catch (DisabledException e) {
+//            throw new Exception("USER_DISABLED", e);
+//        } catch (BadCredentialsException e) {
+//            throw new Exception("INVALID_CREDENTIALS", e);
+//        }
 
-            final String token = jwtTokenUtil.generateToken(userDetails);
+        Authentication authentication = authenticationManager
+                .authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
 
-            return ResponseEntity.ok(new JwtToken(token));
-        } catch (DisabledException e) {
-            throw new Exception("USER_DISABLED", e);
-        } catch (BadCredentialsException e) {
-            throw new Exception("INVALID_CREDENTIALS", e);
-        }
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+
+        ResponseCookie jwtCookie = jwtTokenUtil.generateJwtCookie(userDetails);
+
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(item -> item.getAuthority())
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
+                .body(new UserInfoResponse(userDetails.getUser().getId(),
+                        userDetails.getUser().getIme(),
+                        userDetails.getUser().getPrezime(),
+                        userDetails.getUsername(),
+                        userDetails.getUser().getEmail(),
+                        roles));
+
+
     }
 
     @PostMapping(value = "/register")
@@ -103,6 +132,13 @@ public class AuthController {
 
         return ResponseEntity.ok(new MessageResponse("User registered successfully!"));
 
+    }
+
+    @PostMapping("/signout")
+    public ResponseEntity<?> logoutUser() {
+        ResponseCookie cookie = jwtTokenUtil.getCleanJwtCookie();
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(new MessageResponse("You've been signed out!"));
     }
 
 }
