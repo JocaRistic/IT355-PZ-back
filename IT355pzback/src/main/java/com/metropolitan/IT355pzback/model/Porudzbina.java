@@ -19,11 +19,11 @@ public class Porudzbina {
     @Column(name = "id", nullable = false)
     private Integer id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "id_telefon", nullable = false)
     private Telefon telefon;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "id_user", nullable = false)
     private User user;
 
@@ -39,4 +39,16 @@ public class Porudzbina {
     @Column(name = "stanje", nullable = false)
     private String stanje;
 
+    @Override
+    public String toString() {
+        return "Porudzbina{" +
+                "id=" + id +
+                ", telefon=" + telefon +
+                ", user=" + user +
+                ", adresaDostave='" + adresaDostave + '\'' +
+                ", postanskiBroj='" + postanskiBroj + '\'' +
+                ", brojTelefona='" + brojTelefona + '\'' +
+                ", stanje='" + stanje + '\'' +
+                '}';
+    }
 }

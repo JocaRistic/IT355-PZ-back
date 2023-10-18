@@ -48,4 +48,21 @@ public class Telefon {
 
     @Column(name = "slika_url", nullable = false)
     private String slikaUrl;
+
+    @Override
+    public String toString() {
+        return "Telefon{" +
+                "id=" + id +
+                ", brend='" + brend + '\'' +
+                ", model='" + model + '\'' +
+                ", dijagonalaEkrana='" + dijagonalaEkrana + '\'' +
+                ", ram='" + ram + '\'' +
+                ", memorija='" + memorija + '\'' +
+                ", kamera='" + kamera + '\'' +
+                ", baterija='" + baterija + '\'' +
+                ", rezolucija='" + rezolucija + '\'' +
+                ", cena=" + cena +
+                ", slikaUrl='" + slikaUrl + '\'' +
+                '}';
+    }
 }
